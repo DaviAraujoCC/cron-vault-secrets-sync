@@ -1,0 +1,30 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: test
+  namespace: default
+spec:
+  schedule: "*/1 * * * *"
+  failedJobsHistoryLimit: 1
+  successfulJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: vault-sync
+          containers:
+          - name: vault-sync
+            image: david13356/vault-secret-sync-test:latest
+            env:
+            - name: VAULT_ADDR
+              value: "http://vault:8200"
+            - name: VAULT_PREFIX_KEY_PATH
+              value: "k8s/metadata/prod/apps/"
+            - name: SECRET_STORE_REF
+              value: "vault-backend"
+            - name: VAULT_TOKEN
+              value: "hvs.CAESIM8nICe1DDAmwwjMJERQibHWDUgF-1CMLAKPL2l__jDXGh4KHGh2cy5nNWprZFlYV2lvcmJYWnhoZGVVSE9OSmg"
+            - name: NAMESPACE
+              value: "default"
+          restartPolicy: OnFailure
+
