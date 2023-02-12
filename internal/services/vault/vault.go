@@ -8,6 +8,7 @@ import (
 
 type VaultClient interface {
 	ListSecrets(path string) (*vaultapi.Secret, error)
+	GetSecretMetadata(path string) (*vaultapi.Secret, error)
 }
 
 type vaultClient struct {
@@ -39,4 +40,15 @@ func (v *vaultClient)ListSecrets(path string) (*vaultapi.Secret, error) {
 	}
 
 	return secret, nil
+}
+
+func (v *vaultClient)GetSecretMetadata(secretKeyPath string) (*vaultapi.Secret, error) {
+
+	
+	metadata, err := v.client.Logical().Read(secretKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("Error reading secret metadata: %s", err)
+	}
+
+	return metadata, nil
 }

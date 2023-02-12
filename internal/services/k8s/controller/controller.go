@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	k8sauth "cron-vault-sync/internal/services/k8s/auth"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,9 +19,9 @@ type ObjectsController interface {
 	GetSecret(name string) (*corev1.Secret, error)
 	ListSecrets() (*corev1.SecretList, error)
 
-	//ExternalSecrets
-	ListExternalSecrets() (*unstructured.UnstructuredList, error)
-	CreateExternalSecret(name, keyPath, secretStoreName string) (error)
+	//Vault CRD Secrets
+	ListVaultCRDSecrets() (*unstructured.UnstructuredList, error)
+	CreateVaultCRDSecret(name, secretKeyPath string, customMetadata map[string]interface{}) (error)
 
 }
 
@@ -58,45 +59,42 @@ func (c *objectsController) ListSecrets() (*corev1.SecretList, error) {
 	return c.clientset.CoreV1().Secrets(c.Namespace).List(context.Background(),metav1.ListOptions{})
 }
 
-func (c *objectsController) CreateExternalSecret(name, keyPath, secretStoreName string) (error) {
+func (c *objectsController) CreateVaultCRDSecret(name, secretKeyPath string, customMetadata map[string]interface{}) (error) {
 
-	// Define the ExternalSecret CRD
-	externalSecret := &unstructured.Unstructured{
+	secretKeyPath = strings.ReplaceAll(secretKeyPath, "metadata/", "")
+
+	vaultcrdsecret := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "external-secrets.io/v1beta1",
-			"kind":       "ExternalSecret",
+			"apiVersion": "koudingspawn.de/v1",
+			"kind":       "Vault",
 			"metadata": map[string]interface{}{
 				"name": name,
 			},
 			"spec": map[string]interface{}{
-				"refreshInterval": "15s",
-				"secretStoreRef": map[string]interface{}{
-					"name": secretStoreName,
-					"kind": "SecretStore",
-				},
-				"target": map[string]interface{}{
-					"name": 	name,
-					"namespace": c.Namespace,
-				},
-				"dataFrom": []map[string]interface{}{
-					{
-						"extract": map[string]interface{}{
-							"key": keyPath,
-						},
-					},
-				},
+				"path": secretKeyPath,
+				"type": "KEYVALUEV2",
 			},
 		},
 	}
+	
+	if customMetadata != nil {
+		if v, ok := customMetadata["app-owner"]; ok {
+			vaultcrdsecret.Object["spec"].(map[string]interface{})["changeAdjustmentCallback"] = map[string]interface{}{
+				"type": "deployment",
+				"name": v,
+			}
+		}
+	}
+	
 
 	gvr := schema.GroupVersionResource{
-		Group:    "external-secrets.io",
-		Version:  "v1beta1",
-		Resource: "externalsecrets",
+		Group:    "koudingspawn.de",
+		Version:  "v1",
+		Resource: "vault",
 	}
 
 	
-	_, err := c.dynamicClientSet.Resource(gvr).Namespace(c.Namespace).Create(context.Background(), externalSecret, metav1.CreateOptions{})
+	_, err := c.dynamicClientSet.Resource(gvr).Namespace(c.Namespace).Create(context.Background(), vaultcrdsecret, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -104,11 +102,11 @@ func (c *objectsController) CreateExternalSecret(name, keyPath, secretStoreName 
 	return nil
 }
 
-func (c *objectsController) ListExternalSecrets() (*unstructured.UnstructuredList, error) {
+func (c *objectsController) ListVaultCRDSecrets() (*unstructured.UnstructuredList, error) {
 	gvr := schema.GroupVersionResource{
-		Group:    "external-secrets.io",
-		Version:  "v1beta1",
-		Resource: "externalsecrets",
+		Group:    "koudingspawn.de",
+		Version:  "v1",
+		Resource: "vault",
 	}
 
 	

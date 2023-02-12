@@ -4,15 +4,13 @@ import (
 	"cron-vault-sync/internal/services/k8s/controller"
 	vaultclient "cron-vault-sync/internal/services/vault"
 	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 
-	path := os.Getenv("VAULT_PREFIX_KEY_PATH")
-	secretStoreRef := os.Getenv("SECRET_STORE_REF")
+	keyPath := os.Getenv("VAULT_PREFIX_KEY_PATH")
 	namespace := os.Getenv("NAMESPACE")
 
 	vclient, err := vaultclient.NewVaultClient()
@@ -25,33 +23,45 @@ func main() {
 	 	logrus.Fatal(err)
 	}
 
-	secret, err := vclient.ListSecrets(path)
+	secret, err := vclient.ListSecrets(keyPath)
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	result, err := ctrl.ListExternalSecrets()
+	result, err := ctrl.ListVaultCRDSecrets()
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
 
-	externalSecrets := []string{}
+	vaultCRDSecrets := []string{}
 	for _, s := range result.Items {
-		externalSecrets = append(externalSecrets, s.GetName())
+		vaultCRDSecrets = append(vaultCRDSecrets, s.GetName())
 	}
 
 	for _, s := range secret.Data["keys"].([]interface{}) {
 		secretName := s.(string)
-		if !contains(externalSecrets, secretName) {
-			keyPath := strings.ReplaceAll(path + s.(string), "metadata/", "")
-			err = ctrl.CreateExternalSecret(secretName, keyPath, secretStoreRef)
+		if !contains(vaultCRDSecrets, secretName) {
+			secretKeyPath := keyPath + s.(string)
+			secretMetadata, err := vclient.GetSecretMetadata(secretKeyPath)
+			if err != nil {
+				logrus.Error(err)
+			}
+			
+			var customMetadata map[string]interface{}
+			if secretMetadata.Data["custom_metadata"] != nil {
+				customMetadata = secretMetadata.Data["custom_metadata"].(map[string]interface{})
+			}
+
+			err = ctrl.CreateVaultCRDSecret(secretName, secretKeyPath, customMetadata)
 			if err != nil {
 				logrus.Error(err)
 			} else {
-				logrus.Info("Created ExternalSecret: " + secretName)
+				logrus.Info("Created Vault CRD Secret: " + secretName)
 			}
 		}
+
+		
 	}
 }
 
