@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-	// Initialize the Vault client
 
 	path := os.Getenv("VAULT_PREFIX_KEY_PATH")
 	secretStoreRef := os.Getenv("SECRET_STORE_REF")

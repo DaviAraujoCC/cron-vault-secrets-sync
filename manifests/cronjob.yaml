@@ -1,7 +1,7 @@
 apiVersion: batch/v1beta1
 kind: CronJob
 metadata:
-  name: test
+  name: cron-vault-secrets-sync
   namespace: default
 spec:
   schedule: "*/1 * * * *"
@@ -14,7 +14,7 @@ spec:
           serviceAccount: vault-sync
           containers:
           - name: vault-sync
-            image: david13356/vault-secret-sync-test:latest
+            image: david13356/vault-secrets-sync:latest
             env:
             - name: VAULT_ADDR
               value: "http://vault:8200"
@@ -23,7 +23,7 @@ spec:
             - name: SECRET_STORE_REF
               value: "vault-backend"
             - name: VAULT_TOKEN
-              value: "hvs.CAESIM8nICe1DDAmwwjMJERQibHWDUgF-1CMLAKPL2l__jDXGh4KHGh2cy5nNWprZFlYV2lvcmJYWnhoZGVVSE9OSmg"
+              value: "TOKEN-HERE"
             - name: NAMESPACE
               value: "default"
           restartPolicy: OnFailure
