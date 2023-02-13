@@ -20,8 +20,11 @@ type ObjectsController interface {
 	ListSecrets() (*corev1.SecretList, error)
 
 	//Vault CRD Secrets
+	GetVaultCRDSecret(name string) (*unstructured.Unstructured, error)
 	ListVaultCRDSecrets() (*unstructured.UnstructuredList, error)
 	CreateVaultCRDSecret(name, secretKeyPath string, customMetadata map[string]interface{}) (error)
+	UpdateVaultCRDSecret(name string, vaultCRDSecret *unstructured.Unstructured) (error)
+	DeleteVaultCRDSecret(name string) (error)
 
 }
 
@@ -57,6 +60,16 @@ func (c *objectsController) GetSecret(name string) (*corev1.Secret, error) {
 
 func (c *objectsController) ListSecrets() (*corev1.SecretList, error) {
 	return c.clientset.CoreV1().Secrets(c.Namespace).List(context.Background(),metav1.ListOptions{})
+}
+
+func (c *objectsController) GetVaultCRDSecret(name string) (*unstructured.Unstructured, error) {
+	gvr := schema.GroupVersionResource{
+		Group:    "koudingspawn.de",
+		Version:  "v1",
+		Resource: "vault",
+	}
+
+	return c.dynamicClientSet.Resource(gvr).Namespace(c.Namespace).Get(context.Background(), name, metav1.GetOptions{})
 }
 
 func (c *objectsController) CreateVaultCRDSecret(name, secretKeyPath string, customMetadata map[string]interface{}) (error) {
@@ -116,4 +129,35 @@ func (c *objectsController) ListVaultCRDSecrets() (*unstructured.UnstructuredLis
 	}
 
 	return result, err
+}
+
+func (c *objectsController) UpdateVaultCRDSecret(name string, vaultCRDSecret *unstructured.Unstructured) (error) {
+	gvr := schema.GroupVersionResource{
+		Group:    "koudingspawn.de",
+		Version:  "v1",
+		Resource: "vault",
+	}
+
+	_, err := c.dynamicClientSet.Resource(gvr).Namespace(c.Namespace).Update(context.Background(), vaultCRDSecret, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *objectsController) DeleteVaultCRDSecret(name string) (error) {
+
+	gvr := schema.GroupVersionResource{
+		Group:    "koudingspawn.de",
+		Version:  "v1",
+		Resource: "vault",
+	}
+
+	err := c.dynamicClientSet.Resource(gvr).Namespace(c.Namespace).Delete(context.Background(), name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

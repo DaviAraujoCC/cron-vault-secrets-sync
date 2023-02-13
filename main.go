@@ -59,16 +59,36 @@ func main() {
 			} else {
 				logrus.Info("Created Vault CRD Secret: " + secretName)
 			}
+		} 
+		// if secret only exists in vault, delete it from k8s
+		for _, vs := range vaultCRDSecrets {
+			if !contains(secret.Data["keys"].([]interface{}), vs) {
+				err = ctrl.DeleteVaultCRDSecret(vs)
+				if err != nil {
+					logrus.Error(err)
+				} else {
+					logrus.Info("Deleted Vault CRD Secret: " + vs)
+				}
+			}
 		}
 
 		
 	}
 }
 
-func contains[T []string](s T, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
+func contains(s interface{}, e string) bool {
+	switch as := s.(type) {
+	case []string:
+		for _, a := range as {
+			if a == e {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, a := range as {
+			if a.(string) == e {
+				return true
+			}
 		}
 	}
 	return false

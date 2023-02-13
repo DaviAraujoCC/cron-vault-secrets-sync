@@ -5,7 +5,7 @@ metadata:
 rules:
 - apiGroups: ["koudingspawn.de"]
   resources: ["vault"]
-  verbs: ["list", "get", "create"]
+  verbs: ["list", "get", "create", "delete", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
