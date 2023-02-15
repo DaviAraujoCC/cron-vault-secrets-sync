@@ -4,61 +4,88 @@ import (
 	"cron-vault-sync/internal/services/k8s/controller"
 	vaultclient "cron-vault-sync/internal/services/vault"
 	"os"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
 
-	path := os.Getenv("VAULT_PREFIX_KEY_PATH")
-	secretStoreRef := os.Getenv("SECRET_STORE_REF")
+	keyPath := os.Getenv("VAULT_PREFIX_KEY_PATH")
 	namespace := os.Getenv("NAMESPACE")
-
 	vclient, err := vaultclient.NewVaultClient()
 	if err != nil {
-		logrus.New().Fatal(err)
+		logrus.Fatal(err)
 	}
-
 	ctrl, err := controller.NewObjectsController(namespace)
 	if err != nil {
-	 	logrus.Fatal(err)
+		logrus.Fatal(err)
 	}
-
-	secret, err := vclient.ListSecrets(path)
+	secrets, err := vclient.ListSecrets(keyPath)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	vaultCRDSecrets, err := ctrl.ListVaultCRDSecrets()
 	if err != nil {
 		logrus.Fatal(err)
 	}
 
-	result, err := ctrl.ListExternalSecrets()
-	if err != nil {
-		logrus.Fatal(err)
+	secretNames := []string{}
+	for _, s := range secrets.Data["keys"].([]interface{}) {
+		secretNames = append(secretNames, s.(string))
+	}
+	crdSecretNames := []string{}
+	for _, s := range vaultCRDSecrets.Items {
+		crdSecretNames = append(crdSecretNames, s.GetName())
 	}
 
-
-	externalSecrets := []string{}
-	for _, s := range result.Items {
-		externalSecrets = append(externalSecrets, s.GetName())
-	}
-
-	for _, s := range secret.Data["keys"].([]interface{}) {
-		secretName := s.(string)
-		if !contains(externalSecrets, secretName) {
-			keyPath := strings.ReplaceAll(path + s.(string), "metadata/", "")
-			err = ctrl.CreateExternalSecret(secretName, keyPath, secretStoreRef)
+	for _, secretName := range secretNames {
+		if !contains(crdSecretNames, secretName) {
+			secretKeyPath := keyPath + secretName
+			metadata, err := vclient.GetSecretMetadata(secretKeyPath)
 			if err != nil {
 				logrus.Error(err)
+				continue
+			}
+			customMetadata := make(map[string]interface{})
+			if metadata.Data["custom_metadata"] != nil {
+				customMetadata = metadata.Data["custom_metadata"].(map[string]interface{})
+			}
+			if err := ctrl.CreateVaultCRDSecret(secretName, secretKeyPath, customMetadata); err != nil {
+				logrus.Error(err)
 			} else {
-				logrus.Info("Created ExternalSecret: " + secretName)
+				logrus.Info("Created Vault CRD Secret: " + secretName)
+			}
+		}
+	}
+
+	for _, crdSecretName := range crdSecretNames {
+		if !contains(secretNames, crdSecretName) {
+			if err := ctrl.DeleteVaultCRDSecret(crdSecretName); err != nil {
+				logrus.Error(err)
+			} else {
+				logrus.Info("Deleted Vault CRD Secret: " + crdSecretName)
 			}
 		}
 	}
 }
 
-func contains[T []string](s T, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
+
+
+
+
+func contains(s interface{}, e string) bool {
+	switch as := s.(type) {
+	case []string:
+		for _, a := range as {
+			if a == e {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, a := range as {
+			if a.(string) == e {
+				return true
+			}
 		}
 	}
 	return false
