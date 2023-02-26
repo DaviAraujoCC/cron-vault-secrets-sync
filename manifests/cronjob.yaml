@@ -21,7 +21,7 @@ spec:
             - name: VAULT_PREFIX_KEY_PATH
               value: "k8s/metadata/prod/apps/"
             - name: VAULT_TOKEN
-              value: "hvs.CAESIM8nICe1DDAmwwjMJERQibHWDUgF-1CMLAKPL2l__jDXGh4KHGh2cy5nNWprZFlYV2lvcmJYWnhoZGVVSE9OSmg"
+              value: "TOKEN-HERE"
             - name: NAMESPACE
               value: "default"
           restartPolicy: OnFailure
